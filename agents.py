@@ -24,7 +24,7 @@ AGENTS = {
 End your report with one line per suspect, in this exact machine-parseable format:
 SUSPECT_POSITION: <Full Suspect Name> | implicating=<comma-separated evidence letters or NONE> | supporting=<comma-separated evidence letters or NONE>
 where "implicating" lists FACT-labeled clues that directly point to that suspect, and "supporting" lists FACT-labeled clues that support their alibi or exclude them. Example line:
-SUSPECT_POSITION: Elena Cruz | implicating=B,E | supporting=NONE''',
+SUSPECT_POSITION: Arjun Vale | implicating=B,E | supporting=NONE''',
     'Suspect Agent': '''Compare every suspect's motive, means, opportunity, and alibi. Use a compact table. Rank suspects, but explicitly state what is not proven.''',
     'Skeptic Agent': '''Challenge the current investigation. Find alternative explanations, weak assumptions, possible planted evidence, and missing information. State what would change the conclusion.''',
     'Chief Agent': '''Act as the responsible investigation chief. Synthesize the specialist reports. Before naming a suspect, state their net evidence position: FACT-labeled clues that implicate them, minus FACT-labeled clues that support their alibi or exclude them, citing letters for each. Name the most likely suspect and give a confidence percentage derived from that net count — more net implicating facts with fewer contradictions should mean higher confidence; a single uncorroborated or contested fact should not exceed 60%. Cite the decisive clues by letter, discuss the best alternative theory, and recommend the next investigative step. Never claim certainty beyond the evidence.''',

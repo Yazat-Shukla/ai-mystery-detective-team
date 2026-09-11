@@ -4,13 +4,17 @@ from validator import extract_valid_evidence_ids, SUSPECT_NAMES
 def resolve_leading_suspect(chief_report: str) -> str | None:
     """
     Extracts and resolves the primary/leading suspect named by the Chief Agent.
-    Prevents arbitrary list order or positional fallback when multiple suspects are mentioned in prose.
+    Requires explicit semantic association or unambiguous single-suspect verdict context.
+    Prevents arbitrary occurrence order or dictionary fallbacks when multiple suspects appear in prose.
     """
+    if not chief_report:
+        return None
+
     # 1. Look for explicit verdict/leading suspect pattern
     patterns = [
-        r"(?:most likely suspect|leading suspect|primary suspect|prime suspect|name[d]? suspect)[\s:\-\*]+\*?([A-Z][a-z]+\s+[A-Z][a-z]+)\*?",
-        r"([A-Z][a-z]+\s+[A-Z][a-z]+)\s+is\s+(?:the\s+)?(?:most likely suspect|primary suspect|prime suspect|the perpetrator)",
-        r"(?:verdict|conclusion)[\s:\-\*]+\*?([A-Z][a-z]+\s+[A-Z][a-z]+)\*?"
+        r"(?:most likely suspect|leading suspect|primary suspect|prime suspect|named suspect)[\s:\-\*]+(?:is\s+)?\*?\*?([A-Z][a-z]+\s+[A-Z][a-z]+)\*?\*?",
+        r"\*?\*?([A-Z][a-z]+\s+[A-Z][a-z]+)\*?\*?\s+(?:is|remains|identified as)\s+(?:the\s+)?(?:most likely|leading|primary|prime)\s+(?:suspect|perpetrator)",
+        r"\bverdict[\s:\-\*]+\*?\*?([A-Z][a-z]+\s+[A-Z][a-z]+)\*?\*?(?:$|[\.\,\;\n])"
     ]
     for pattern in patterns:
         match = re.search(pattern, chief_report, re.IGNORECASE)
@@ -20,17 +24,16 @@ def resolve_leading_suspect(chief_report: str) -> str | None:
                 if candidate.lower() == suspect.lower():
                     return suspect
 
-    # 2. Search lines containing verdict key phrases
+    # 2. Search lines containing explicit positive verdict key phrases (unambiguous single-suspect context)
+    negs = ["not", "never", "unproven", "unconfirmed", "doubt", "alternative"]
     for line in chief_report.splitlines():
-        if any(kw in line.lower() for kw in ["most likely", "leading suspect", "primary suspect", "verdict", "conclusion"]):
-            for suspect in SUSPECT_NAMES:
-                if suspect.lower() in line.lower():
-                    return suspect
-
-    # 3. Fallback: If only a single suspect is mentioned in the entire text
-    mentioned = [s for s in SUSPECT_NAMES if s.lower() in chief_report.lower()]
-    if len(mentioned) == 1:
-        return mentioned[0]
+        line_lower = line.lower()
+        if any(re.search(r"\b" + neg + r"\b", line_lower) for neg in negs):
+            continue
+        if any(kw in line_lower for kw in ["most likely suspect", "leading suspect", "primary suspect", "prime suspect"]):
+            found_suspects = [s for s in SUSPECT_NAMES if s.lower() in line_lower]
+            if len(found_suspects) == 1:
+                return found_suspects[0]
 
     return None
 

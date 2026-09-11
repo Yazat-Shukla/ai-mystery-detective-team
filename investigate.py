@@ -62,14 +62,18 @@ def run_investigation(case_file: str, progress_callback=None, variant_label: str
     if progress_callback is not None:
         progress_callback(1.0, desc='Case review complete')
         
-    leading_suspect = audit_results.get("named_suspects", ["Unknown"])[0] if audit_results.get("named_suspects") else "Unknown"
+    leading_suspect = audit_results.get("named_suspects", ["unresolved"])[0] if audit_results.get("named_suspects") else "unresolved"
     confidence = audit_results.get("claimed_confidence", 0) or 0
-    elena_net = validation_metrics.get("suspect_positions", {}).get("Elena Cruz", {}).get("net_position", 0)
+    suspect_positions = validation_metrics.get("suspect_positions", {})
+    if leading_suspect in suspect_positions:
+        leading_suspect_net = suspect_positions[leading_suspect].get("net_position", 0)
+    else:
+        leading_suspect_net = 0
     
     record_run(
         variant_label=variant_label,
         leading_suspect=leading_suspect,
-        net_position=elena_net,
+        net_position=leading_suspect_net,
         confidence=confidence,
         audit_score=audit_results.get("score", 100),
         details=audit_results
@@ -79,7 +83,9 @@ def run_investigation(case_file: str, progress_callback=None, variant_label: str
         "variant_label": variant_label,
         "validation": validation_metrics,
         "audit": audit_results,
-        "suspect_positions": validation_metrics.get("suspect_positions", {})
+        "suspect_positions": suspect_positions,
+        "leading_suspect": leading_suspect,
+        "leading_suspect_net": leading_suspect_net
     }
     
     return reports, metadata

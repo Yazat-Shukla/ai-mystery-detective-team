@@ -37,7 +37,7 @@ def parse_evidence_classifications(report_text: str, valid_ids: list[str], warni
         return {letter: "UNLABELED" for letter in valid_ids}
 
     for letter in valid_ids:
-        pattern = r"(?:Clue\s+)?\[?\b" + letter + r"\]?[\s:\-]+(FACT|INFERENCE|DISTRACTION)"
+        pattern = r"(?:Clue\s+)?\[?\*?\*?\b" + letter + r"\b\*?\*?\]?[\s:\-\*]+(FACT|INFERENCE|DISTRACTION)"
         matches = re.findall(pattern, report_text, re.IGNORECASE)
         
         if not matches:
@@ -241,7 +241,7 @@ def validate_evidence_report(report_text: str, case_file_text: str) -> dict:
 
     classifications = parse_evidence_classifications(report_text, valid_ids, warnings)
 
-    all_cited_letters = re.findall(r"\b([A-Z])\s*[\:\-]\s*(?:FACT|INFERENCE|DISTRACTION)\b", report_text)
+    all_cited_letters = re.findall(r"\[?\*?\*?\b([A-Z])\b\*?\*?\]?[\s:\-\*]+(?:FACT|INFERENCE|DISTRACTION)\b", report_text)
     for letter in set(all_cited_letters):
         if letter not in valid_ids:
             errors.append(f"Invalid Evidence ID '{letter}' cited. Case file only contains: {', '.join(valid_ids)}")

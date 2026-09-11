@@ -128,8 +128,10 @@ def investigate_comparison(progress=gr.Progress()):
     orig_band = orig_pos.get("confidence_recommendation", {}).get("recommended_band", "N/A")
     var_band = var_pos.get("confidence_recommendation", {}).get("recommended_band", "N/A")
     
-    orig_claimed = meta_orig['audit'].get('claimed_confidence', 'N/A')
-    var_claimed = meta_var['audit'].get('claimed_confidence', 'N/A')
+    orig_claimed_val = meta_orig['audit'].get('claimed_confidence')
+    var_claimed_val = meta_var['audit'].get('claimed_confidence')
+    orig_claimed_str = f"{orig_claimed_val}%" if isinstance(orig_claimed_val, int) else "N/A"
+    var_claimed_str = f"{var_claimed_val}%" if isinstance(var_claimed_val, int) else "N/A"
     
     suspect_delta = "Same leading suspect" if orig_suspect == var_suspect else f"Suspect shifted ({orig_suspect} -> {var_suspect})"
     
@@ -144,6 +146,8 @@ def investigate_comparison(progress=gr.Progress()):
     removed_ids = sorted(list(set(orig_ids) - set(var_ids)))
     removed_str = ", ".join(removed_ids) if removed_ids else "None"
 
+    suspect_stability = f"Leading suspect identity remained {orig_suspect} when physical trace evidence is omitted." if orig_suspect == var_suspect else f"Leading suspect shifted from {orig_suspect} to {var_suspect} when physical trace evidence is omitted."
+
     comparison_summary = f"""### ⚖️ Dynamic Case Variant Comparison Summary
 
 | Metric | Original Case (With Evidence {removed_str}) | Variant Case (Without Evidence {removed_str}) | Delta / Change |
@@ -151,7 +155,7 @@ def investigate_comparison(progress=gr.Progress()):
 | **Leading Suspect** | `{orig_suspect}` | `{var_suspect}` | `{suspect_delta}` |
 | **Leading Suspect Net Position** | `{orig_net_str}` | `{var_net_str}` | `{net_delta}` |
 | **Recommended Confidence Band** | `{orig_band}` | `{var_band}` | Band shift |
-| **Chief's Stated Confidence** | `{orig_claimed}%` | `{var_claimed}%` | Stated confidence |
+| **Chief's Stated Confidence** | `{orig_claimed_str}` | `{var_claimed_str}` | Stated confidence |
 | **Audit Checklist Status** | Score `{meta_orig['audit'].get('score', 100)}/100` | Score `{meta_var['audit'].get('score', 100)}/100` | Audit checklist check |
 
 #### 🔍 WHAT CHANGED (Dynamic Run Analysis):
@@ -159,9 +163,9 @@ def investigate_comparison(progress=gr.Progress()):
 - **Leading Suspect Net Position**: Changed from `{orig_net_str}` to `{var_net_str}` (`{net_delta}`).
 - **Recommended Confidence Band**: Shifted from `{orig_band}` to `{var_band}`.
 
-#### 📌 WHAT REMAINED STABLE:
+#### 📌 WHAT REMAINED STABLE / SHIFTED:
 - Case timeline, access logs, and suspect roster.
-- Leading suspect identity ({orig_suspect}) when physical trace evidence is omitted.
+- {suspect_stability}
 - Requirement for human review and physical evidence verification prior to official action.
 """
 

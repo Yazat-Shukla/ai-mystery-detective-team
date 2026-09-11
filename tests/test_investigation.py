@@ -139,3 +139,106 @@ def test_audit_chief_evidence_consistency_mismatch():
     mismatch_text = "Most likely suspect: Arjun Vale with 80% confidence. Net evidence position: +5. Decisive clues: Evidence B. Remaining uncertainty exists. Alternative theory considered. Recommend interview."
     audit = audit_chief_report(mismatch_text, CASE_FILE, {"suspect_positions": case_positions})
     assert any("Chief claimed net evidence position (5) differs from deterministic calculation" in w for w in audit["warnings"])
+
+def test_resolve_leading_suspect_cases():
+    # 1. Explicit direct form
+    assert resolve_leading_suspect("Arjun Vale is the most likely suspect.") == "Arjun Vale"
+    
+    # 2. Reverse-order multi-suspect sentence (must resolve Arjun Vale, NOT Lena Ortiz)
+    assert resolve_leading_suspect("Lena Ortiz is the best alternative, while Arjun Vale is the most likely suspect.") == "Arjun Vale"
+    
+    # 3. Alternative mentioned after leader
+    assert resolve_leading_suspect("Arjun Vale is the most likely suspect; Lena Ortiz is the best alternative.") == "Arjun Vale"
+    
+    # 4. Ambiguous multi-suspect line
+    assert resolve_leading_suspect("Arjun Vale and Lena Ortiz are both plausible suspects.") is None
+    
+    # 5. Incidental mention without verdict phrase
+    assert resolve_leading_suspect("Arjun Vale is discussed only as an alternative.") is None
+    assert resolve_leading_suspect("Lena Ortiz is the alternative, and Arjun Vale is another possibility.") is None
+    
+    # 6. Negative conclusion statement (must NOT resolve suspect merely because 'Conclusion' or 'Verdict' is present)
+    assert resolve_leading_suspect("Conclusion: Arjun Vale is not established as the perpetrator.") is None
+    assert resolve_leading_suspect("Verdict: Arjun Vale is not established as the perpetrator.") is None
+    
+    # 7. Dictionary-order independence & case normalization
+    assert resolve_leading_suspect("Most likely suspect: arjun vale") == "Arjun Vale"
+    assert resolve_leading_suspect("Most likely suspect:   Arjun Vale  ") == "Arjun Vale"
+    
+    # 8. Unmatched / near-miss name returns None
+    assert resolve_leading_suspect("Most likely suspect: John Doe") is None
+
+def test_audit_uses_same_resolved_suspect_consistently():
+    # If Lena Ortiz is resolved as leading suspect, audit must use Lena's net and confidence band
+    report = """
+Clue B: FACT
+Clue D: FACT
+SUSPECT_POSITION: Lena Ortiz | implicating=B,D | supporting=NONE
+SUSPECT_POSITION: Arjun Vale | implicating=NONE | supporting=NONE
+SUSPECT_POSITION: Theo Park | implicating=NONE | supporting=NONE
+SUSPECT_POSITION: Sofia Reed | implicating=NONE | supporting=NONE
+"""
+    positions = calculate_suspect_positions(CASE_FILE, report_text=report)
+    chief_text = "Most likely suspect: Lena Ortiz with 60% confidence. Decisive clues: B, D. Remaining uncertainty exists."
+    audit = audit_chief_report(chief_text, CASE_FILE, {"suspect_positions": positions})
+    
+    assert audit["named_suspects"] == ["Lena Ortiz"]
+    assert audit["recommended_band"] == "55% - 65%"
+    assert audit["confidence_consistent"]
+
+def test_sequential_isolation_original_to_variant():
+    from validator import validate_evidence_report
+    report_orig = """
+Clue B: FACT
+Clue E: FACT
+SUSPECT_POSITION: Arjun Vale | implicating=B,E | supporting=NONE
+SUSPECT_POSITION: Lena Ortiz | implicating=NONE | supporting=NONE
+SUSPECT_POSITION: Theo Park | implicating=NONE | supporting=NONE
+SUSPECT_POSITION: Sofia Reed | implicating=NONE | supporting=NONE
+"""
+    report_var = """
+Clue B: FACT
+SUSPECT_POSITION: Arjun Vale | implicating=B | supporting=NONE
+SUSPECT_POSITION: Lena Ortiz | implicating=NONE | supporting=NONE
+SUSPECT_POSITION: Theo Park | implicating=NONE | supporting=NONE
+SUSPECT_POSITION: Sofia Reed | implicating=NONE | supporting=NONE
+"""
+    val_orig = validate_evidence_report(report_orig, CASE_FILE)
+    val_var = validate_evidence_report(report_var, CASE_FILE_VARIANT)
+    
+    assert "E" in val_orig["valid_evidence_ids"]
+    assert "E" not in val_var["valid_evidence_ids"]
+    assert val_orig["suspect_positions"]["Arjun Vale"]["net_position"] == 2
+    assert val_var["suspect_positions"]["Arjun Vale"]["net_position"] == 1
+    assert val_orig["suspect_positions"]["Arjun Vale"]["confidence_recommendation"]["recommended_band"] == "75% - 85%"
+    assert val_var["suspect_positions"]["Arjun Vale"]["confidence_recommendation"]["recommended_band"] == "55% - 65%"
+
+def test_mocked_end_to_end_pipeline(monkeypatch):
+    mock_responses = {
+        "Detective Agent": "Timeline: Diamond disappeared between 14:00 and 14:30.",
+        "Evidence Agent": """Clue B: FACT
+Clue D: FACT
+Clue E: FACT
+SUSPECT_POSITION: Lena Ortiz | implicating=B,D | supporting=NONE
+SUSPECT_POSITION: Arjun Vale | implicating=E | supporting=NONE
+SUSPECT_POSITION: Theo Park | implicating=NONE | supporting=NONE
+SUSPECT_POSITION: Sofia Reed | implicating=NONE | supporting=NONE""",
+        "Suspect Agent": "Lena Ortiz had opportunity. Arjun Vale had physical trace.",
+        "Skeptic Agent": "Trace evidence could be secondary transfer.",
+        "Chief Agent": "Most likely suspect: Lena Ortiz with 60% confidence. Net evidence position: +2. Decisive clues: B, D. Remaining uncertainty exists. Alternative theory considered. Recommend interview."
+    }
+    
+    def mock_ask_agent(name, instruction, case_file, shared_context):
+        return mock_responses[name]
+        
+    from investigate import run_investigation
+    monkeypatch.setattr("investigate.ask_agent", mock_ask_agent)
+    
+    reports, meta = run_investigation(CASE_FILE, variant_label="Original Test")
+    
+    assert len(reports) == 5
+    assert meta["leading_suspect"] == "Lena Ortiz"
+    assert meta["leading_suspect_net"] == 2
+    assert meta["audit"]["passed"]
+    assert meta["audit"]["confidence_consistent"]
+
