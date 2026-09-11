@@ -1,0 +1,131 @@
+import re
+from validator import extract_valid_evidence_ids, SUSPECT_NAMES
+
+def resolve_leading_suspect(chief_report: str) -> str | None:
+    """
+    Extracts and resolves the primary/leading suspect named by the Chief Agent.
+    Prevents arbitrary list order or positional fallback when multiple suspects are mentioned in prose.
+    """
+    # 1. Look for explicit verdict/leading suspect pattern
+    patterns = [
+        r"(?:most likely suspect|leading suspect|primary suspect|prime suspect|name[d]? suspect)[\s:\-\*]+\*?([A-Z][a-z]+\s+[A-Z][a-z]+)\*?",
+        r"([A-Z][a-z]+\s+[A-Z][a-z]+)\s+is\s+(?:the\s+)?(?:most likely suspect|primary suspect|prime suspect|the perpetrator)",
+        r"(?:verdict|conclusion)[\s:\-\*]+\*?([A-Z][a-z]+\s+[A-Z][a-z]+)\*?"
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, chief_report, re.IGNORECASE)
+        if match:
+            candidate = match.group(1).strip()
+            for suspect in SUSPECT_NAMES:
+                if candidate.lower() == suspect.lower():
+                    return suspect
+
+    # 2. Search lines containing verdict key phrases
+    for line in chief_report.splitlines():
+        if any(kw in line.lower() for kw in ["most likely", "leading suspect", "primary suspect", "verdict", "conclusion"]):
+            for suspect in SUSPECT_NAMES:
+                if suspect.lower() in line.lower():
+                    return suspect
+
+    # 3. Fallback: If only a single suspect is mentioned in the entire text
+    mentioned = [s for s in SUSPECT_NAMES if s.lower() in chief_report.lower()]
+    if len(mentioned) == 1:
+        return mentioned[0]
+
+    return None
+
+def audit_chief_report(chief_report: str, case_file_text: str, validation_metrics: dict) -> dict:
+    """
+    Performs a deterministic Python quality control audit on the Chief Agent's verdict.
+    """
+    valid_ids = extract_valid_evidence_ids(case_file_text)
+    suspect_positions = validation_metrics.get("suspect_positions", {})
+    checks = {}
+    warnings = []
+    errors = []
+    
+    # 1. Named Suspect Resolution
+    leading_suspect = resolve_leading_suspect(chief_report)
+    checks["suspect_identified"] = leading_suspect is not None
+    
+    if leading_suspect:
+        named_suspects = [leading_suspect]
+    else:
+        named_suspects = []
+        errors.append("Chief suspect could not be matched to deterministic suspect data")
+        
+    # 2. Cited Evidence Validity Check
+    cited_letters = set(re.findall(r"\b([A-Z])\b", chief_report))
+    invalid_citations = [c for c in cited_letters if len(c) == 1 and c not in valid_ids and c not in ['A', 'I']]
+    
+    checks["valid_citations"] = len(invalid_citations) == 0
+    if invalid_citations:
+        warnings.append(f"Chief report cited unknown letters not in case: {', '.join(invalid_citations)}")
+        
+    if "E" not in valid_ids and "E" in cited_letters:
+        errors.append("Chief report cited Evidence E, but Evidence E is removed from this case variant!")
+        
+    # 3. Uncertainty Check
+    checks["uncertainty_acknowledged"] = any(
+        w in chief_report.lower() for w in ["uncertain", "unconfirmed", "not proven", "possibility", "doubt", "uncertainty"]
+    )
+    if not checks["uncertainty_acknowledged"]:
+        warnings.append("Chief report failed to explicitly acknowledge remaining uncertainty.")
+        
+    # 4. Alternative Theory Check
+    checks["alternative_theory_included"] = any(
+        w in chief_report.lower() for w in ["alternative", "theory", "other suspect", "planted", "borrowed"]
+    )
+    if not checks["alternative_theory_included"]:
+        warnings.append("Chief report missing explicit discussion of alternative theories.")
+        
+    # 5. Next Investigative Step Check
+    checks["next_step_recommended"] = any(
+        w in chief_report.lower() for w in ["next step", "recommend", "investigate", "interview", "forensic", "verify"]
+    )
+    if not checks["next_step_recommended"]:
+        warnings.append("Chief report missing recommended next investigative step.")
+        
+    # 6. Bounded & Deterministic Confidence Alignment Check
+    conf_match = re.search(r"(\d{1,3})\s*%", chief_report)
+    claimed_confidence = int(conf_match.group(1)) if conf_match else None
+    
+    if leading_suspect and leading_suspect in suspect_positions:
+        suspect_meta = suspect_positions[leading_suspect]
+        conf_rec = suspect_meta.get("confidence_recommendation", {})
+        recommended_min = conf_rec.get("recommended_min", 30)
+        recommended_max = conf_rec.get("recommended_max", 85)
+        recommended_band = conf_rec.get("recommended_band", "55% - 85%")
+        
+        confidence_consistent = True
+        if claimed_confidence is not None:
+            # Inclusive comparison: lower <= claimed <= upper
+            if not (recommended_min <= claimed_confidence <= recommended_max):
+                confidence_consistent = False
+                warnings.append(
+                    f"WARNING: Chief confidence ({claimed_confidence}%) differs from deterministic evidence assessment "
+                    f"(recommended band: {recommended_band})."
+                )
+    else:
+        confidence_consistent = False
+        recommended_band = "N/A"
+        if leading_suspect is None:
+            warnings.append("WARNING: Chief confidence could not be validated against deterministic band (unresolved suspect name).")
+            
+    checks["confidence_consistent"] = confidence_consistent
+    
+    passed_count = sum(1 for v in checks.values() if v)
+    score = int((passed_count / len(checks)) * 100) if checks else 100
+    
+    return {
+        "passed": len(errors) == 0,
+        "score": score,
+        "checks": checks,
+        "errors": errors,
+        "warnings": warnings,
+        "named_suspects": named_suspects,
+        "claimed_confidence": claimed_confidence,
+        "recommended_band": recommended_band,
+        "confidence_consistent": confidence_consistent,
+        "human_review_required": True
+    }
