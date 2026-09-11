@@ -79,7 +79,7 @@ def run_investigation(case_file: str, progress_callback=None, variant_label: str
         "variant_label": variant_label,
         "validation": validation_metrics,
         "audit": audit_results,
-        "suspect_positions": validation_metrics.get("suspect_positions", calculate_suspect_positions(case_file))
+        "suspect_positions": validation_metrics.get("suspect_positions", {})
     }
     
     return reports, metadata

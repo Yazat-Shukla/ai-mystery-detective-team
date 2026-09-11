@@ -28,9 +28,25 @@ def test_resolve_leading_suspect_sentence_substring_trap():
     """
     assert resolve_leading_suspect(text) == "Elena Cruz"
 
+MOCK_REPORT = """
+Clue A: FACT
+Clue B: FACT
+Clue C: INFERENCE
+Clue D: FACT
+Clue E: FACT
+Clue F: FACT
+Clue G: DISTRACTION
+Clue H: FACT
+
+SUSPECT_POSITION: Priya Desai | implicating=NONE | supporting=A
+SUSPECT_POSITION: Marcus Webb | implicating=NONE | supporting=D
+SUSPECT_POSITION: Elena Cruz | implicating=B,E | supporting=NONE
+SUSPECT_POSITION: Julian Roth | implicating=F | supporting=H
+"""
+
 def test_dictionary_order_independence():
     # Reorder suspect_positions dictionary keys
-    case_positions = calculate_suspect_positions(CASE_FILE)
+    case_positions = calculate_suspect_positions(CASE_FILE, report_text=MOCK_REPORT)
     
     # Original order
     audit1 = audit_chief_report("Most likely suspect: Elena Cruz with 80% confidence. Decisive clues: B, E. Remaining uncertainty exists.", CASE_FILE, {"suspect_positions": case_positions})
@@ -49,7 +65,7 @@ def test_dictionary_order_independence():
     assert audit2["confidence_consistent"]
 
 def test_audit_boundary_values_inclusive():
-    case_positions = calculate_suspect_positions(CASE_FILE)
+    case_positions = calculate_suspect_positions(CASE_FILE, report_text=MOCK_REPORT)
     
     # Lower boundary: 75% for original band (75%-85%) -> Consistent
     audit_lower = audit_chief_report("Most likely suspect: Elena Cruz with 75% confidence. Decisive clues: B, E. Remaining uncertainty exists.", CASE_FILE, {"suspect_positions": case_positions})
@@ -65,7 +81,7 @@ def test_audit_boundary_values_inclusive():
     assert audit_mismatch["recommended_band"] == "75% - 85%"  # Must NOT be 30%-50%!
 
 def test_audit_variant_boundary_values():
-    variant_positions = calculate_suspect_positions(CASE_FILE_VARIANT)
+    variant_positions = calculate_suspect_positions(CASE_FILE_VARIANT, report_text=MOCK_REPORT)
     
     # Lower boundary: 55% for variant band (55%-65%) -> Consistent
     audit_lower = audit_chief_report("Most likely suspect: Elena Cruz with 55% confidence. Decisive clues: B. Remaining uncertainty exists.", CASE_FILE_VARIANT, {"suspect_positions": variant_positions})
@@ -77,7 +93,7 @@ def test_audit_variant_boundary_values():
     assert audit_upper["confidence_consistent"]
 
 def test_audit_idempotency():
-    case_positions = calculate_suspect_positions(CASE_FILE)
+    case_positions = calculate_suspect_positions(CASE_FILE, report_text=MOCK_REPORT)
     text = "Most likely suspect: Elena Cruz with 80% confidence. Decisive clues: B, E. Remaining uncertainty exists."
     
     res1 = audit_chief_report(text, CASE_FILE, {"suspect_positions": case_positions})
@@ -86,7 +102,7 @@ def test_audit_idempotency():
     assert res1 == res2
 
 def test_unmatched_suspect_no_silent_fallback():
-    case_positions = calculate_suspect_positions(CASE_FILE)
+    case_positions = calculate_suspect_positions(CASE_FILE, report_text=MOCK_REPORT)
     text = "Most likely suspect: Unknown Intruder with 80% confidence. Decisive clues: B, E."
     
     audit = audit_chief_report(text, CASE_FILE, {"suspect_positions": case_positions})
