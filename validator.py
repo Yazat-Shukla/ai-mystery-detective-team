@@ -11,27 +11,48 @@ def extract_valid_evidence_ids(case_file_text: str) -> list[str]:
     """
     Extracts all evidence letters (e.g. ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])
     present in the CASE FILE text.
+    Raises ValueError if the case file or evidence section is missing/malformed.
     """
+    if not case_file_text or not case_file_text.strip():
+        raise ValueError("case_file_text is empty or missing.")
+
     evidence_section = re.search(r"EVIDENCE\s*\n(.*?)(?:\n\n|\nUNRESOLVED|\nRULES|$)", case_file_text, re.DOTALL)
     if not evidence_section:
-        return ["A", "B", "C", "D", "E", "F", "G", "H"]
+        raise ValueError("Could not locate EVIDENCE section in case file text.")
     
     matches = re.findall(r"^([A-Z])\.\s+", evidence_section.group(1), re.MULTILINE)
+    if not matches:
+        raise ValueError("Could not extract any valid evidence IDs from case file EVIDENCE section.")
+
     return sorted(list(set(matches)))
 
-def parse_evidence_classifications(report_text: str, valid_ids: list[str]) -> dict[str, str]:
+def parse_evidence_classifications(report_text: str, valid_ids: list[str], warnings: list = None) -> dict[str, str]:
     """
     Parses clue classifications from Evidence Agent report text.
-    Looks for patterns like 'A: FACT', 'B: FACT', 'C: INFERENCE', 'E: FACT', etc.
+    Collects ALL occurrences for each valid evidence ID.
+    If conflicting classifications exist (e.g. FACT vs INFERENCE), marks as CONFLICTING and records a warning.
     """
     classifications = {}
+    if not report_text:
+        return {letter: "UNLABELED" for letter in valid_ids}
+
     for letter in valid_ids:
         pattern = r"(?:Clue\s+)?\[?" + letter + r"\]?[\s:\-]+(FACT|INFERENCE|DISTRACTION)"
-        match = re.search(pattern, report_text, re.IGNORECASE)
-        if match:
-            classifications[letter] = match.group(1).upper()
-        else:
+        matches = re.findall(pattern, report_text, re.IGNORECASE)
+        
+        if not matches:
             classifications[letter] = "UNLABELED"
+        else:
+            normalized_matches = sorted(list(set(m.upper() for m in matches)))
+            if len(normalized_matches) == 1:
+                classifications[letter] = normalized_matches[0]
+            else:
+                classifications[letter] = "CONFLICTING"
+                if warnings is not None:
+                    warnings.append(
+                        f"Conflicting classifications found for Clue {letter}: {', '.join(normalized_matches)}."
+                    )
+
     return classifications
 
 def compute_confidence_recommendation(net_position: int, has_physical_trace: bool) -> dict:
@@ -74,9 +95,12 @@ def calculate_suspect_positions(
     if not report_text or not report_text.strip():
         raise ValueError("report_text is required for calculate_suspect_positions and cannot be empty.")
 
+    if warnings is None:
+        warnings = []
+
     valid_ids = extract_valid_evidence_ids(case_file_text)
     if classifications is None:
-        classifications = parse_evidence_classifications(report_text, valid_ids)
+        classifications = parse_evidence_classifications(report_text, valid_ids, warnings)
 
     if warnings is None:
         warnings = []
@@ -212,10 +236,10 @@ def validate_evidence_report(report_text: str, case_file_text: str) -> dict:
             "suspect_positions": {}
         }
 
-    classifications = parse_evidence_classifications(report_text, valid_ids)
-
     errors = []
     warnings = []
+
+    classifications = parse_evidence_classifications(report_text, valid_ids, warnings)
 
     all_cited_letters = re.findall(r"\b([A-Z])\s*[\:\-]\s*(?:FACT|INFERENCE|DISTRACTION)\b", report_text)
     for letter in set(all_cited_letters):

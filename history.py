@@ -1,12 +1,11 @@
 import time
-import json
-import os
 
+# In-memory session run history storage (no persistent database or file log)
 RUN_HISTORY = []
 
 def record_run(variant_label: str, leading_suspect: str, net_position: int, confidence: int, audit_score: int, details: dict = None) -> dict:
     """
-    Records an investigation run in lightweight memory and appends to local JSON log.
+    Records an investigation run in lightweight session memory.
     """
     entry = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -25,5 +24,6 @@ def get_run_history() -> list[dict]:
     return list(RUN_HISTORY)
 
 def clear_run_history():
-    """Clears session history."""
+    """Clears in-memory session history."""
     RUN_HISTORY.clear()
+

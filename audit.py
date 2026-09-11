@@ -37,6 +37,8 @@ def resolve_leading_suspect(chief_report: str) -> str | None:
 def audit_chief_report(chief_report: str, case_file_text: str, validation_metrics: dict) -> dict:
     """
     Performs a deterministic Python quality control audit on the Chief Agent's verdict.
+    Evaluates structural completeness, citation validity, and consistency against deterministic metrics.
+    Note: The audit score is a structural checklist score, not an AI model accuracy percentage.
     """
     valid_ids = extract_valid_evidence_ids(case_file_text)
     suspect_positions = validation_metrics.get("suspect_positions", {})
@@ -54,15 +56,26 @@ def audit_chief_report(chief_report: str, case_file_text: str, validation_metric
         named_suspects = []
         errors.append("Chief suspect could not be matched to deterministic suspect data")
         
-    # 2. Cited Evidence Validity Check
-    cited_letters = set(re.findall(r"\b([A-Z])\b", chief_report))
-    invalid_citations = [c for c in cited_letters if len(c) == 1 and c not in valid_ids and c not in ['A', 'I']]
+    # 2. Cited Evidence Validity Check (uses explicit citation patterns to avoid false positives on prose capitals)
+    citation_patterns = [
+        r"\b(?:Evidence|Clue|Letter)\s+([A-Z])\b",
+        r"\bclues?\s+([A-Z])\b",
+        r"\[([A-Z])\]",
+        r"\(([A-Z])\)",
+        r"\b([A-Z])\s*[\:\-]\s*(?:FACT|INFERENCE|DISTRACTION)\b"
+    ]
+    found_citations = set()
+    for pattern in citation_patterns:
+        for match in re.finditer(pattern, chief_report, re.IGNORECASE):
+            found_citations.add(match.group(1).upper())
+
+    invalid_citations = [c for c in found_citations if c not in valid_ids]
     
     checks["valid_citations"] = len(invalid_citations) == 0
     if invalid_citations:
-        warnings.append(f"Chief report cited unknown letters not in case: {', '.join(invalid_citations)}")
+        warnings.append(f"Chief report cited unknown letters not in case: {', '.join(sorted(invalid_citations))}")
         
-    if "E" not in valid_ids and "E" in cited_letters:
+    if "E" not in valid_ids and "E" in found_citations:
         errors.append("Chief report cited Evidence E, but Evidence E is removed from this case variant!")
         
     # 3. Uncertainty Check
@@ -106,6 +119,17 @@ def audit_chief_report(chief_report: str, case_file_text: str, validation_metric
                     f"WARNING: Chief confidence ({claimed_confidence}%) differs from deterministic evidence assessment "
                     f"(recommended band: {recommended_band})."
                 )
+
+        # Net evidence position consistency check
+        net_match = re.search(r"net(?:\s+evidence)?\s+(?:position|count)[\s:\-=]+\+?(-?\d+)", chief_report, re.IGNORECASE)
+        if net_match:
+            claimed_net = int(net_match.group(1))
+            actual_net = suspect_meta.get("net_position")
+            if actual_net is not None and claimed_net != actual_net:
+                warnings.append(
+                    f"WARNING: Chief claimed net evidence position ({claimed_net}) differs from deterministic calculation "
+                    f"({actual_net}) for {leading_suspect}."
+                )
     else:
         confidence_consistent = False
         recommended_band = "N/A"
@@ -115,11 +139,11 @@ def audit_chief_report(chief_report: str, case_file_text: str, validation_metric
     checks["confidence_consistent"] = confidence_consistent
     
     passed_count = sum(1 for v in checks.values() if v)
-    score = int((passed_count / len(checks)) * 100) if checks else 100
+    checklist_score = int((passed_count / len(checks)) * 100) if checks else 100
     
     return {
         "passed": len(errors) == 0,
-        "score": score,
+        "score": checklist_score,  # Python Audit Checklist Score
         "checks": checks,
         "errors": errors,
         "warnings": warnings,

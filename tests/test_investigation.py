@@ -114,11 +114,31 @@ def test_unmatched_suspect_no_silent_fallback():
 def test_run_history_recording():
     clear_run_history()
     record_run("Original Case", "Elena Cruz", 2, 80, 100)
-    record_run("Variant Case", "Elena Cruz", 1, 60, 100)
+    record_run("Variant Case", "Julian Roth", 0, 45, 100)
     
     history = get_run_history()
     assert len(history) == 2
     assert history[0]["variant"] == "Original Case"
+    assert history[0]["leading_suspect"] == "Elena Cruz"
     assert history[0]["net_position"] == 2
     assert history[1]["variant"] == "Variant Case"
-    assert history[1]["net_position"] == 1
+    assert history[1]["leading_suspect"] == "Julian Roth"
+    assert history[1]["net_position"] == 0
+
+def test_audit_chief_citation_parsing_prose_words():
+    # Prose capital letters like "I am A detective" should NOT cause invalid citation warnings
+    case_positions = calculate_suspect_positions(CASE_FILE, report_text=MOCK_REPORT)
+    prose_text = "I am A lead detective writing B: FACT about Evidence B. Remaining uncertainty exists. Alternative theory considered. Recommended next step is forensic lab check."
+    audit = audit_chief_report(prose_text, CASE_FILE, {"suspect_positions": case_positions})
+    
+    # Should not warn about unknown letters 'I' or 'A'
+    assert audit["checks"]["valid_citations"]
+    assert not any("unknown letters not in case" in w for w in audit["warnings"])
+
+def test_audit_chief_evidence_consistency_mismatch():
+    case_positions = calculate_suspect_positions(CASE_FILE, report_text=MOCK_REPORT)
+    # Chief claims net position +5, but actual net position for Elena is +2
+    mismatch_text = "Most likely suspect: Elena Cruz with 80% confidence. Net evidence position: +5. Decisive clues: Evidence B. Remaining uncertainty exists. Alternative theory considered. Recommend interview."
+    audit = audit_chief_report(mismatch_text, CASE_FILE, {"suspect_positions": case_positions})
+    assert any("Chief claimed net evidence position (5) differs from deterministic calculation" in w for w in audit["warnings"])
+

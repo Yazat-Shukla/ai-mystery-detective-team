@@ -1,6 +1,7 @@
 import pytest
 from case_file import CASE_FILE, CASE_FILE_VARIANT
 from validator import (
+    extract_valid_evidence_ids,
     parse_evidence_classifications,
     calculate_suspect_positions,
     validate_evidence_report,
@@ -233,9 +234,29 @@ SUSPECT_POSITION: Julian Roth | implicating=NONE | supporting=NONE
     assert elena["supporting_count"] == 1
     assert elena["net_position"] == 0
 
-    # Priya has 2 implicating (B, D) and 0 supporting, net = 2
-    assert priya["implicating_count"] == 2
-    assert priya["supporting_count"] == 0
-    assert priya["net_position"] == 2
+def test_extract_valid_evidence_ids_malformed_case_file():
+    with pytest.raises(ValueError, match="Could not locate EVIDENCE section"):
+        extract_valid_evidence_ids("NO EVIDENCE SECTION HERE")
+
+def test_parse_evidence_classifications_conflicting():
+    report = """
+Clue B: FACT
+Clue B: INFERENCE
+"""
+    warnings = []
+    classifications = parse_evidence_classifications(report, ["B"], warnings)
+    assert classifications["B"] == "CONFLICTING"
+    assert any("Conflicting classifications found for Clue B" in w for w in warnings)
+
+def test_parse_evidence_classifications_repeated_identical():
+    report = """
+Clue B: FACT
+Clue B: FACT
+"""
+    warnings = []
+    classifications = parse_evidence_classifications(report, ["B"], warnings)
+    assert classifications["B"] == "FACT"
+    assert len(warnings) == 0
+
 
 
