@@ -1,10 +1,10 @@
 import re
 
 SUSPECT_NAMES = [
-    "Priya Desai",
-    "Marcus Webb",
-    "Elena Cruz",
-    "Julian Roth"
+    "Lena Ortiz",
+    "Theo Park",
+    "Arjun Vale",
+    "Sofia Reed"
 ]
 
 def extract_valid_evidence_ids(case_file_text: str) -> list[str]:
@@ -37,7 +37,7 @@ def parse_evidence_classifications(report_text: str, valid_ids: list[str], warni
         return {letter: "UNLABELED" for letter in valid_ids}
 
     for letter in valid_ids:
-        pattern = r"(?:Clue\s+)?\[?" + letter + r"\]?[\s:\-]+(FACT|INFERENCE|DISTRACTION)"
+        pattern = r"(?:Clue\s+)?\[?\b" + letter + r"\]?[\s:\-]+(FACT|INFERENCE|DISTRACTION)"
         matches = re.findall(pattern, report_text, re.IGNORECASE)
         
         if not matches:
@@ -250,7 +250,7 @@ def validate_evidence_report(report_text: str, case_file_text: str) -> dict:
         errors.append("Evidence E cited, but Evidence E is removed from this case variant!")
 
     if "C" in classifications and classifications["C"] == "FACT":
-        warnings.append("Clue C (Elena's statement) was labeled as FACT. Suspect self-statements should be INFERENCE unless corroborated.")
+        warnings.append("Clue C (Arjun's statement) was labeled as FACT. Suspect self-statements should be INFERENCE unless corroborated.")
 
     try:
         suspect_positions = calculate_suspect_positions(case_file_text, classifications, report_text, warnings)

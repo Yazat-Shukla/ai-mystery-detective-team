@@ -107,7 +107,7 @@ python -m pytest
 - **Deterministic Python Validation (`validator.py`)**: Parses clue IDs, validates evidence references against the active case file, enforces rules against uncorroborated suspect self-statements, and computes suspect net evidence positions (`implicating_facts - supporting_facts`) directly from Evidence Agent outputs without hardcoded answer keys.
 - **Python Audit Checklist Layer (`audit.py`)**: Performs post-synthesis checks on the Chief Agent verdict to ensure valid citations, bounded confidence, explicit uncertainty, alternative theories, and next investigative steps. Scores reflect structural checklist compliance, distinct from LLM confidence or statistical accuracy.
 - **Evidence Lineage & Human Review (`app.py`)**: Displays leading suspect evidence lineage (implicating vs. supporting FACTs, net score, recommended band vs. stated confidence) and workshop human review control buttons (`Accept Verdict`, `Request Revision`, `Reject Verdict`).
-- **Dynamic Case Variant Comparison**: Compares the original case against `CASE_FILE_VARIANT` (where Evidence E — the white gesso trace — is removed) side-by-side with dynamic, data-driven change summaries (`WHAT CHANGED` vs `WHAT REMAINED STABLE`).
+- **Dynamic Case Variant Comparison**: Compares the original case against `CASE_FILE_VARIANT` (where Evidence E — blue velvet fibers — is removed) side-by-side with dynamic, data-driven change summaries (`WHAT CHANGED` vs `WHAT REMAINED STABLE`).
 - **Rate Limit Retry Handling (`agents.py`)**: Automatic exponential backoff retry mechanism for API rate limits (HTTP 429).
 - **Distinction of Scoring Systems**:
   - **LLM Stated Confidence**: Confidence percentage asserted in Chief prose.

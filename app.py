@@ -122,6 +122,8 @@ def investigate_comparison(progress=gr.Progress()):
     
     orig_net = orig_pos.get('net_position', 'N/A')
     var_net = var_pos.get('net_position', 'N/A')
+    orig_net_str = f"+{orig_net}" if isinstance(orig_net, int) and orig_net > 0 else str(orig_net)
+    var_net_str = f"+{var_net}" if isinstance(var_net, int) and var_net > 0 else str(var_net)
     
     orig_band = orig_pos.get("confidence_recommendation", {}).get("recommended_band", "N/A")
     var_band = var_pos.get("confidence_recommendation", {}).get("recommended_band", "N/A")
@@ -147,14 +149,14 @@ def investigate_comparison(progress=gr.Progress()):
 | Metric | Original Case (With Evidence {removed_str}) | Variant Case (Without Evidence {removed_str}) | Delta / Change |
 | :--- | :---: | :---: | :---: |
 | **Leading Suspect** | `{orig_suspect}` | `{var_suspect}` | `{suspect_delta}` |
-| **Leading Suspect Net Position** | `+{orig_net}` | `+{var_net}` | `{net_delta}` |
+| **Leading Suspect Net Position** | `{orig_net_str}` | `{var_net_str}` | `{net_delta}` |
 | **Recommended Confidence Band** | `{orig_band}` | `{var_band}` | Band shift |
 | **Chief's Stated Confidence** | `{orig_claimed}%` | `{var_claimed}%` | Stated confidence |
 | **Audit Checklist Status** | Score `{meta_orig['audit'].get('score', 100)}/100` | Score `{meta_var['audit'].get('score', 100)}/100` | Audit checklist check |
 
 #### 🔍 WHAT CHANGED (Dynamic Run Analysis):
 - **Removed Evidence ID(s)**: `{removed_str}`.
-- **Leading Suspect Net Position**: Changed from `+{orig_net}` to `+{var_net}` (`{net_delta}`).
+- **Leading Suspect Net Position**: Changed from `{orig_net_str}` to `{var_net_str}` (`{net_delta}`).
 - **Recommended Confidence Band**: Shifted from `{orig_band}` to `{var_band}`.
 
 #### 📌 WHAT REMAINED STABLE:
