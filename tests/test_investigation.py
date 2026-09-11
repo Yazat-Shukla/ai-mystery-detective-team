@@ -160,6 +160,8 @@ def test_resolve_leading_suspect_cases():
     # 6. Negative conclusion statement (must NOT resolve suspect merely because 'Conclusion' or 'Verdict' is present)
     assert resolve_leading_suspect("Conclusion: Arjun Vale is not established as the perpetrator.") is None
     assert resolve_leading_suspect("Verdict: Arjun Vale is not established as the perpetrator.") is None
+    assert resolve_leading_suspect("Verdict: Arjun Vale remains unconfirmed.") is None
+    assert resolve_leading_suspect("Conclusion: Lena Ortiz is one possible explanation, but no leading suspect has been established.") is None
     
     # 7. Dictionary-order independence & case normalization
     assert resolve_leading_suspect("Most likely suspect: arjun vale") == "Arjun Vale"

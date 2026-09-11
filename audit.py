@@ -25,7 +25,7 @@ def resolve_leading_suspect(chief_report: str) -> str | None:
                     return suspect
 
     # 2. Search lines containing explicit positive verdict key phrases (unambiguous single-suspect context)
-    negs = ["not", "never", "unproven", "unconfirmed", "doubt", "alternative"]
+    negs = ["not", "never", "no", "none", "unproven", "unconfirmed", "unestablished", "doubt", "alternative"]
     for line in chief_report.splitlines():
         line_lower = line.lower()
         if any(re.search(r"\b" + neg + r"\b", line_lower) for neg in negs):
